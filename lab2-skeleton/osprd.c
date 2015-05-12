@@ -122,7 +122,12 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 
 	// Your code here.
 	unsigned int requestType=rq_data_dir(req);
-	uint8_t* ptr=d->data+(req->sector)*SECTOR_SIZE;
+	uint8_t* ptr=d->data+((req->sector)*SECTOR_SIZE);
+	if((req->sector+req->current_nr_sectors)>nsectors)
+	{
+		eprintk("Non-existing sector is trying to read/written from/to.");
+		end_request(req,0);
+	}
 	if(requestType==READ)
 	{
 		memcpy(req->buffer,ptr,req->current_nr_sectors*SECTOR_SIZE);
@@ -131,8 +136,11 @@ static void osprd_process_request(osprd_info_t *d, struct request *req)
 	{
 		memcpy(ptr,req->buffer,req->current_nr_sectors*SECTOR_SIZE);
 	}
-	eprintk("Should process request...\n");
-
+	else
+	{
+		eprintk("Not read or write\n");
+		end_request(req,0);
+	}
 	end_request(req, 1);
 }
 
