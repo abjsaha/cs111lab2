@@ -44,7 +44,12 @@ MODULE_AUTHOR("Abhijoy Saha and Jasmine Mok");
 static int nsectors = 32;
 module_param(nsectors, int, 0);
 
-
+typedef struct read_list* read_list_t;
+struct read_list
+{
+	pid_t pid;
+	read_list_t next;
+};
 /* The internal representation of our device. */
 typedef struct osprd_info {
 	uint8_t *data;                  // The data array. Its size is
@@ -64,7 +69,10 @@ typedef struct osprd_info {
 
 	/* HINT: You may want to add additional fields to help
 	         in detecting deadlock. */
-
+	int numWriteLocks;
+	int numReadLocks;
+	pid_t writeLockPid;
+	read_list_t readLockPids; 
 	// The following elements are used internally; you don't need
 	// to understand them.
 	struct request_queue *queue;    // The device request queue.
@@ -170,7 +178,45 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		// as appropriate.
 
 		// Your code here.
-		
+		if(filp->f_flags&&F_OSPRD_LOCKED)
+		{
+			osp_spin_lock(&d->mutex);//acquire spin lock
+			if(filp_writable)
+			{//if write lock is being released
+				d->writeLockPid=-1;
+				d->numWriteLocks--;
+			}
+			else
+			{//if read lock is being released
+				d->numReadLocks--;
+				read_list_t p=d->readLockPids;
+				read_list_t c=d->readLockPids;
+				while(c)//iterate through list of read locks
+				{
+					if(c->pid==current->pid)//if process id matches with currently running process
+					{
+						if(p)//if previous exists
+						{
+							c->pid=-1;
+							p->next=c->next;
+							break;
+						}
+						else//if previous is null
+						{
+							d->readLockPids=c->next;
+						}
+					}
+					else//iterate incrementation
+					{
+						p=c;
+						c=c->next;
+					}
+				}
+			}
+			wake_up_all(&d->blockq);//wake up all blocked processes
+			filp->f_flags&=~F_OSPRD_LOCKED;
+			osp_spin_unlock(&d->mutex);//release spin lock
+		}
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
 
