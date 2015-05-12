@@ -34,7 +34,7 @@
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("CS 111 RAM Disk");
 // EXERCISE: Pass your names into the kernel as the module's authors.
-MODULE_AUTHOR("Skeletor");
+MODULE_AUTHOR("Abhijoy Saha and Jasmine Mok");
 
 #define OSPRD_MAJOR	222
 
@@ -170,7 +170,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		// as appropriate.
 
 		// Your code here.
-
+		
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
 
