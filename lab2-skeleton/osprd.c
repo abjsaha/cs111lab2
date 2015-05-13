@@ -178,7 +178,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		// as appropriate.
 
 		// Your code here.
-		if(filp->f_flags&&F_OSPRD_LOCKED)
+		if(filp->f_flags&F_OSPRD_LOCKED)
 		{
 			osp_spin_lock(&d->mutex);//acquire spin lock
 			if(filp_writable)
@@ -288,8 +288,14 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Your code here (instead of the next two lines).
 		//eprintk("Attempting to acquire\n");
 		//r = -ENOTTY;
+		if(!d)
+			return -1;
+		osp_spin_lock(&d->mutex);
 		if(current->pid==d->writeLockPid&&filp_writable)
+		{
+			osp_spin_unlock(&d->mutex);
 			return -EDEADLK;
+		}
 		osp_spin_lock(&d->mutex);
 		unsigned myTicket=d->ticket_head;
 		d->ticket_head++;
@@ -315,7 +321,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_unlock(&d->mutex);
 			while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
-				if((wait_event_interruptible(d->blockq,1))==-ERESTARTSYS)
+				int checker=wait_event_interruptible(d->blockq,1);
+				if(checker==-ERESTARTSYS)
 					return -ERESTARTSYS;
 				schedule();
 			}
@@ -328,7 +335,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			while(d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
-				if((wait_event_interruptible(d->blockq,1))==-ERESTARTSYS)
+				int checker=wait_event_interruptible(d->blockq,1);
+				if(checker==-ERESTARTSYS)
 					return -ERESTARTSYS;
 				schedule();
 			}
@@ -367,7 +375,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Otherwise, if we can grant the lock request, return 0.
 
 		// Your code here (instead of the next two lines).
-
+		if(!d)
+			return -1;
 		osp_spin_lock(&d->mutex);
 		read_list_t p=d->readLockPids;
 		read_list_t c=d->readLockPids;
@@ -429,7 +438,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// you need, and return 0.
 
 		// Your code here (instead of the next line).
-		if (filp->f_flags != F_OSPRD_LOCKED)
+		if(!d)
+			return -1;
+		if ((filp->f_flags&F_OSPRD_LOCKED)==0)
 			return -EINVAL;
 		
 		osp_spin_lock(&d->mutex);
@@ -441,8 +452,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			d->numReadLocks--;
 		}
-		filp->f_flags &= ~F_OSPRD_LOCKED;
 		wake_up_all(&d->blockq);
+		filp->f_flags &= ~F_OSPRD_LOCKED;
 		osp_spin_unlock(&d->mutex);
 
 	} else
