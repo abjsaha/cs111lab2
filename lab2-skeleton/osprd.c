@@ -286,9 +286,77 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// be protected by a spinlock; which ones?)
 
 		// Your code here (instead of the next two lines).
-		eprintk("Attempting to acquire\n");
-		r = -ENOTTY;
-
+		//eprintk("Attempting to acquire\n");
+		//r = -ENOTTY;
+		if(current->pid==d->writeLockPid&&filp_writable)
+			return -EDEADLK;
+		osp_spin_lock(&d->mutex);
+		unsigned myTicket=d->ticket_head;
+		d->ticket_head++;
+		osp_spin_unlock(&d->mutex);
+		if(filp_writable)
+		{
+			osp_spin_lock(&d->mutex);
+			read_list_t p=d->readLockPids;
+			read_list_t c=d->readLockPids;
+			while(c)//iterate through list of read locks
+			{
+				if(c->pid==current->pid)//if process id matches with currently running process
+				{
+					osp_spin_unlock(&d->mutex);
+					return -EDEADLK;
+				}
+				else//iterate incrementation
+				{
+					p=c;
+					c=c->next;
+				}
+			}
+			osp_spin_unlock(&d->mutex);
+			while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
+			{
+				if((wait_event_interruptible(d->blockq,1))==-ERESTARTSYS)
+					return -ERESTARTSYS;
+				schedule();
+			}
+			osp_spin_lock(&d->mutex);
+			filp->f_flags |= F_OSPRD_LOCKED;
+			d->numWriteLocks++;
+			d->numWriteLocks=current->pid;
+		}
+		else
+		{
+			while(d->numWriteLocks||myTicket!=d->ticket_tail)
+			{
+				if((wait_event_interruptible(d->blockq,1))==-ERESTARTSYS)
+					return -ERESTARTSYS;
+				schedule();
+			}
+			osp_spin_lock(&d->mutex);
+			filp->f_flags |= F_OSPRD_LOCKED;
+			d->numReadLocks++;
+			read_list_t p=d->readLockPids;
+			read_list_t c=d->readLockPids;
+			if(p)
+			{
+				while(c)
+				{
+					p=c;
+					c=c->next;
+				}
+				p->next=kmalloc(sizeof(read_list_t),GFP_ATOMIC);
+				p->next->pid=current->pid;
+				p->next->next=NULL;
+			}
+			else
+			{
+				d->readLockPids=kmalloc(sizeof(read_list_t),GFP_ATOMIC);
+				d->readLockPids->pid=current->pid;
+				d->readLockPids->next=NULL;
+			}
+		}
+		d->ticket_tail++;
+		osp_spin_unlock(&d->mutex);
 	} else if (cmd == OSPRDIOCTRYACQUIRE) {
 
 		// EXERCISE: ATTEMPT to lock the ramdisk.
