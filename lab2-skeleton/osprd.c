@@ -367,6 +367,26 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Otherwise, if we can grant the lock request, return 0.
 
 		// Your code here (instead of the next two lines).
+
+		osp_spin_lock(&d->mutex);
+		read_list_t p=d->readLockPids;
+		read_list_t c=d->readLockPids;
+		while(c)//iterate through list of read locks
+		{
+			if(c->pid==current->pid)//if process id matches with currently running process
+			{
+				osp_spin_unlock(&d->mutex);
+				r = -EBUSY;
+				//return -EDEADLK;
+			}
+			else//iterate incrementation
+			{
+				p=c;
+				c=c->next;
+			}
+		}
+		osp_spin_unlock(&d->mutex);
+	
 		
 		osp_spin_lock(&d->mutex);
 		if (filp_writable)
@@ -409,7 +429,21 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// you need, and return 0.
 
 		// Your code here (instead of the next line).
-		r = -ENOTTY;
+		if (filp->f_flags != F_OSPRD_LOCKED)
+			return -EINVAL;
+		
+		osp_spin_lock(&d->mutex);
+		if (filp_writable)
+		{
+			d->numWriteLocks--;
+		}
+		else
+		{
+			d->numReadLocks--;
+		}
+		filp->f_flags &= ~F_OSPRD_LOCKED;
+		wake_up_all(&d->blockq);
+		osp_spin_unlock(&d->mutex);
 
 	} else
 		r = -ENOTTY; /* unknown command */
