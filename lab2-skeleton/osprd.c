@@ -512,8 +512,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Your code here (instead of the next line).
 		if(!d)
 			return -1;
+		osp_spin_lock(&d->mutex);
 		if ((filp->f_flags&F_OSPRD_LOCKED)==0)
+		{
+			osp_spin_unlock(&d->mutex);
 			return -EINVAL;
+		}
+		osp_spin_unlock(&d->mutex);
 		osp_spin_lock(&d->mutex);
 		if (arg == 1)
 		{
@@ -550,7 +555,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->numReadLocks--;
 		}
 		filp->f_flags &= ~F_OSPRD_LOCKED;
-		wake_up_all(&d->blockq);
+		if(!d->numWriteLocks&&!d->numReadLocks)
+			wake_up_all(&d->blockq);
 		osp_spin_unlock(&d->mutex);
 		r=0;
 
