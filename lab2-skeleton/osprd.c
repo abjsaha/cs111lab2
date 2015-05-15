@@ -180,21 +180,25 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		// Your code here.
 		if(filp->f_flags&F_OSPRD_LOCKED)
 		{
+			eprintk("Test1\n");
 			osp_spin_lock(&d->mutex);//acquire spin lock
 			if(filp_writable)
 			{//if write lock is being released
 				d->writeLockPid=-1;
 				d->numWriteLocks--;
+				eprintk("Test2\n");
 			}
 			else
 			{//if read lock is being released
 				d->numReadLocks--;
 				read_list_t p=d->readLockPids;
 				read_list_t c=d->readLockPids;
+				eprintk("Test3\n");
 				while(c)//iterate through list of read locks
 				{
 					if(c->pid==current->pid)//if process id matches with currently running process
 					{
+
 						if(p)//if previous exists
 						{
 							c->pid=-1;
@@ -205,6 +209,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 						{
 							d->readLockPids=c->next;
 						}
+						eprintk("Test5\n");
 					}
 					else//iterate incrementation
 					{
@@ -213,9 +218,11 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 					}
 				}
 			}
+			eprintk("Test5\n");
 			wake_up_all(&d->blockq);//wake up all blocked processes
 			filp->f_flags&=~F_OSPRD_LOCKED;
 			osp_spin_unlock(&d->mutex);//release spin lock
+			eprintk("Test6\n");
 		}
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
@@ -249,7 +256,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	// Set 'r' to the ioctl's return value: 0 on success, negative on error
 
 	if (cmd == OSPRDIOCACQUIRE) {
-
+		eprintk("Test71\n");
 		// EXERCISE: Lock the ramdisk.
 		//
 		// If *filp is open for writing (filp_writable), then attempt
@@ -291,18 +298,28 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		if(!d)
 			return -1;
 		osp_spin_lock(&d->mutex);
+		eprintk("Test8\n");
 		if(current->pid==d->writeLockPid&&filp_writable)
 		{
 			osp_spin_unlock(&d->mutex);
+			eprintk("Test9a\n");
 			return -EDEADLK;
 		}
+		else
+		{
+			eprintk("Test9b\n");
+			osp_spin_unlock(&d->mutex);
+		}
 		osp_spin_lock(&d->mutex);
+		eprintk("Test10\n");
 		unsigned myTicket=d->ticket_head;
 		d->ticket_head++;
 		osp_spin_unlock(&d->mutex);
+		eprintk("Test11\n");
 		if(filp_writable)
 		{
 			osp_spin_lock(&d->mutex);
+			eprintk("Test12\n");
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
 			while(c)//iterate through list of read locks
@@ -318,7 +335,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					c=c->next;
 				}
 			}
+			eprintk("Test13\n");
 			osp_spin_unlock(&d->mutex);
+			eprintk("Test14\n");
 			while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
 				int checker=wait_event_interruptible(d->blockq,1);
@@ -326,13 +345,16 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					return -ERESTARTSYS;
 				schedule();
 			}
+			eprintk("Test15\n");
 			osp_spin_lock(&d->mutex);
+			eprintk("Test16\n");
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numWriteLocks++;
 			d->numWriteLocks=current->pid;
 		}
 		else
 		{
+			eprintk("Test17\n");
 			while(d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
 				int checker=wait_event_interruptible(d->blockq,1);
@@ -340,13 +362,16 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					return -ERESTARTSYS;
 				schedule();
 			}
+			eprintk("Test18\n");
 			osp_spin_lock(&d->mutex);
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numReadLocks++;
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
+			eprintk("Test19\n");
 			if(p)
 			{
+				eprintk("Test20\n");
 				while(c)
 				{
 					p=c;
@@ -358,13 +383,16 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 			else
 			{
+				eprintk("Test21\n");
 				d->readLockPids=kmalloc(sizeof(read_list_t),GFP_ATOMIC);
 				d->readLockPids->pid=current->pid;
 				d->readLockPids->next=NULL;
 			}
 		}
+		eprintk("Test22\n");
 		d->ticket_tail++;
 		osp_spin_unlock(&d->mutex);
+		eprintk("Test23\n");
 	} else if (cmd == OSPRDIOCTRYACQUIRE) {
 
 		// EXERCISE: ATTEMPT to lock the ramdisk.
@@ -375,17 +403,22 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Otherwise, if we can grant the lock request, return 0.
 
 		// Your code here (instead of the next two lines).
+		eprintk("Test24\n");
 		if(!d)
 			return -1;
 		osp_spin_lock(&d->mutex);
+		eprintk("Test25\n");
 		read_list_t p=d->readLockPids;
 		read_list_t c=d->readLockPids;
+		int flg=0;
 		while(c)//iterate through list of read locks
 		{
 			if(c->pid==current->pid)//if process id matches with currently running process
 			{
 				osp_spin_unlock(&d->mutex);
 				r = -EBUSY;
+				flg=1;
+				break;
 				//return -EDEADLK;
 			}
 			else//iterate incrementation
@@ -394,10 +427,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				c=c->next;
 			}
 		}
-		osp_spin_unlock(&d->mutex);
+		eprintk("Test26\n");
+		if(!flg)
+			osp_spin_unlock(&d->mutex);
 	
-		
+		eprintk("Test27\n");
 		osp_spin_lock(&d->mutex);
+		eprintk("Test28\n");
 		if (filp_writable)
 		{
 			if (d->ticket_head != d->ticket_tail || d->numWriteLocks > 0 || d->numReadLocks > 0)
@@ -410,6 +446,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				d->numWriteLocks++;
 				r = 0;
 			}
+			eprintk("Test29\n");
 			osp_spin_unlock(&d->mutex);
 		}
 		else 
@@ -424,9 +461,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				d->numReadLocks++;
 				r = 0;
 			}
+			eprintk("Test30\n");
 			osp_spin_unlock(&d->mutex);
 		}
-		
+		eprintk("Test31\n");
 
 	} else if (cmd == OSPRDIOCRELEASE) {
 
@@ -442,8 +480,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			return -1;
 		if ((filp->f_flags&F_OSPRD_LOCKED)==0)
 			return -EINVAL;
-		
+		eprintk("Test31\n");
 		osp_spin_lock(&d->mutex);
+		eprintk("Test32\n");
 		if (filp_writable)
 		{
 			d->numWriteLocks--;
@@ -452,9 +491,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			d->numReadLocks--;
 		}
+		eprintk("Test33\n");
 		wake_up_all(&d->blockq);
 		filp->f_flags &= ~F_OSPRD_LOCKED;
+		eprintk("Test34\n");
 		osp_spin_unlock(&d->mutex);
+		eprintk("Test35\n");
 
 	} else
 		r = -ENOTTY; /* unknown command */
