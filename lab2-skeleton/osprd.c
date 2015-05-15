@@ -442,7 +442,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if(c->pid==current->pid)//if process id matches with currently running process
 			{
 				osp_spin_unlock(&d->mutex);
-				r = -EBUSY;
+				return -EBUSY;
 				flg=1;
 				break;
 				//return -EDEADLK;
@@ -454,15 +454,16 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 		}
 		eprintk("Test26\n");
-		if(!flg)
-			osp_spin_unlock(&d->mutex);
-	
+		osp_spin_unlock(&d->mutex);
+		if(d->ticket_head!=d->ticket_tail)
+			return -EBUSY;
 		eprintk("Test27\n");
 		osp_spin_lock(&d->mutex);
 		eprintk("Test28\n");
+
 		if (filp_writable)
 		{
-			if (d->ticket_head != d->ticket_tail || d->numWriteLocks > 0 || d->numReadLocks > 0)
+			if (d->numWriteLocks|| d->numReadLocks)
 			{
 				r = -EBUSY;
 			}
@@ -477,7 +478,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else 
 		{
-			if (d->ticket_head != d->ticket_tail || d->numWriteLocks > 0)
+			if (d->numWriteLocks)
 			{
 				r = -EBUSY;
 			}
