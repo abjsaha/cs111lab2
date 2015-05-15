@@ -264,7 +264,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	// Set 'r' to the ioctl's return value: 0 on success, negative on error
 	osp_spin_lock_init(&d->mutex);
 	if (cmd == OSPRDIOCACQUIRE) {
-		eprintk("Test71\n");
 		// EXERCISE: Lock the ramdisk.
 		//
 		// If *filp is open for writing (filp_writable), then attempt
@@ -306,29 +305,23 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		if(!d)
 			return -1;
 		osp_spin_lock(&d->mutex);
-		eprintk("Test8\n");
 		if(current->pid==d->writeLockPid&&filp_writable)
 		{
 			osp_spin_unlock(&d->mutex);
-			eprintk("Test9a\n");
 			return -EDEADLK;
 		}
 		else
 		{
-			eprintk("Test9b\n");
 			osp_spin_unlock(&d->mutex);
 		}
 		osp_spin_lock(&d->mutex);
-		eprintk("Test10\n");
 		unsigned myTicket=d->ticket_head;
 		d->ticket_head++;
 		osp_spin_unlock(&d->mutex);
-		eprintk("Test11\n");
 		int flg=0;
 		if(filp_writable)
 		{
 			osp_spin_lock(&d->mutex);
-			eprintk("Test12\n");
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
 			while(c)//iterate through list of read locks
@@ -345,9 +338,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					c=c->next;
 				}
 			}
-			eprintk("Test13\n");
 			osp_spin_unlock(&d->mutex);
-			eprintk("Test14\n");
 			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&d->numReadLocks==0/*&&myTicket==d->ticket_tail*/);
 			/*while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
@@ -356,7 +347,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					return -ERESTARTSYS;
 				schedule();
 			}*/
-			eprintk("Test15\n");
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
@@ -364,14 +354,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
-			eprintk("Test16\n");
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numWriteLocks++;
 			d->writeLockPid=current->pid;
 		}
 		else
 		{
-			eprintk("Test17\n");
 			/*while(d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
 				int checker=wait_event_interruptible(d->blockq,1);
@@ -379,7 +367,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					return -ERESTARTSYS;
 				schedule();
 			}*/
-			eprintk("Test18\n");
 			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0/*&&myTicket==d->ticket_tail*/);
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
@@ -394,10 +381,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->numReadLocks++;
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
-			eprintk("Test19\n");
 			if(p)
 			{
-				eprintk("Test20\n");
 				while(c)
 				{
 					p=c;
@@ -409,15 +394,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 			else
 			{
-				eprintk("Test21\n");
 				d->readLockPids=kmalloc(sizeof(read_list_t),GFP_ATOMIC);
 				d->readLockPids->pid=current->pid;
 				d->readLockPids->next=NULL;
 			}
 		}
-		eprintk("Test22\n");
 		osp_spin_unlock(&d->mutex);
-		eprintk("Test23\n");
 		r=0;
 	} else if (cmd == OSPRDIOCTRYACQUIRE) {
 
@@ -429,11 +411,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Otherwise, if we can grant the lock request, return 0.
 
 		// Your code here (instead of the next two lines).
-		eprintk("Test24\n");
 		if(!d)
 			return -1;
 		osp_spin_lock(&d->mutex);
-		eprintk("Test25\n");
 		read_list_t p=d->readLockPids;
 		read_list_t c=d->readLockPids;
 		int flg=0;
@@ -453,14 +433,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				c=c->next;
 			}
 		}
-		eprintk("Test26\n");
 		osp_spin_unlock(&d->mutex);
 		//if(d->ticket_head!=d->ticket_tail)
 			//return -EBUSY;
-		eprintk("Test27\n");
 		osp_spin_lock(&d->mutex);
-		eprintk("Test28\n");
-
 		if (filp_writable)
 		{
 			if (d->numWriteLocks|| d->numReadLocks)
@@ -474,7 +450,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				d->numWriteLocks++;
 				r = 0;
 			}
-			eprintk("Test29\n");
 			osp_spin_unlock(&d->mutex);
 		}
 		else 
@@ -489,10 +464,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				d->numReadLocks++;
 				read_list_t p=d->readLockPids;
 				read_list_t c=d->readLockPids;
-				eprintk("Test19\n");
 				if(p)
 				{
-					eprintk("Test20\n");
 					while(c)
 					{
 						p=c;
@@ -504,17 +477,14 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				}
 				else
 				{
-					eprintk("Test21\n");
 					d->readLockPids=kmalloc(sizeof(read_list_t),GFP_ATOMIC);
 					d->readLockPids->pid=current->pid;
 					d->readLockPids->next=NULL;
 				}
 				r = 0;
 			}
-			eprintk("Test30\n");
 			osp_spin_unlock(&d->mutex);
 		}
-		eprintk("Test31\n");
 
 	} else if (cmd == OSPRDIOCRELEASE) {
 
@@ -530,9 +500,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			return -1;
 		if ((filp->f_flags&F_OSPRD_LOCKED)==0)
 			return -EINVAL;
-		eprintk("Test31\n");
 		osp_spin_lock(&d->mutex);
-		eprintk("Test32\n");
 		if (arg == 1)
 		{
 			d->numWriteLocks--;
@@ -542,7 +510,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
-			eprintk("Test3\n");
 			while(c)//iterate through list of read locks
 			{
 				if(c->pid==current->pid)//if process id matches with currently running process
@@ -557,7 +524,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 					{
 						d->readLockPids=c->next;
 					}
-					eprintk("Test5\n");
 				}
 				else//iterate incrementation
 				{
@@ -567,13 +533,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 			d->numReadLocks--;
 		}
-		eprintk("Test33\n");
-		
 		filp->f_flags &= ~F_OSPRD_LOCKED;
 		wake_up_all(&d->blockq);
-		eprintk("Test34\n");
 		osp_spin_unlock(&d->mutex);
-		eprintk("Test35\n");
 		r=0;
 
 	} else
