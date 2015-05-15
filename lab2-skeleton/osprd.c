@@ -426,10 +426,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		int flg=0;
 		while(c)//iterate through list of read locks
 		{
-			eprintk("checking for deadlock in TRYACQUIRE"\n);
+			eprintk("checking for deadlock in TRYACQUIRE\n");
 			if(c->pid==current->pid)//if process id matches with currently running process
 			{
-				eprintk("EBUSY in TRYACQUIRE"\n);
+				eprintk("EBUSY in TRYACQUIRE\n");
 				osp_spin_unlock(&d->mutex);
 				return -EBUSY;
 				flg=1;
@@ -450,12 +450,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			if (d->numWriteLocks|| d->numReadLocks)
 			{
-				eprintk("w EBUSY"\n);
+				eprintk("w EBUSY\n");
 				r = -EBUSY;
 			}
 			else
 			{
-				eprintk("w locked"\n);
+				eprintk("w locked\n");
 				filp->f_flags |= F_OSPRD_LOCKED;
 				d->writeLockPid=current->pid;
 				d->numWriteLocks++;
@@ -467,12 +467,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			if (d->numWriteLocks)
 			{
-				eprintk("r EBUSY");
+				eprintk("r EBUSY\n");
 				r = -EBUSY;
 			}
 			else
 			{
-				eprintk("r locked"\n);
+				eprintk("r locked\n");
 				filp->f_flags |= F_OSPRD_LOCKED;
 				d->numReadLocks++;
 				read_list_t p=d->readLockPids;
@@ -501,7 +501,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 
 	} else if (cmd == OSPRDIOCRELEASE) {
-
+		eprintk("enter OSPRDIOCRELEASE\n");
 		// EXERCISE: Unlock the ramdisk.
 		//
 		// If the file hasn't locked the ramdisk, return -EINVAL.
@@ -517,11 +517,13 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		osp_spin_lock(&d->mutex);
 		if (arg == 1)
 		{
+			eprintk("write lock release\n");
 			d->numWriteLocks--;
 			d->writeLockPid=-1;
 		}
 		else if(arg == 0)
 		{
+			eprintk("read lock release\n");
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
 			while(c)//iterate through list of read locks
