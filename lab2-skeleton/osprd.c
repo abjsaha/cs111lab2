@@ -455,8 +455,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		eprintk("Test26\n");
 		osp_spin_unlock(&d->mutex);
-		if(d->ticket_head!=d->ticket_tail)
-			return -EBUSY;
+		//if(d->ticket_head!=d->ticket_tail)
+			//return -EBUSY;
 		eprintk("Test27\n");
 		osp_spin_lock(&d->mutex);
 		eprintk("Test28\n");
