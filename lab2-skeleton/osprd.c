@@ -348,7 +348,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			eprintk("Test13\n");
 			osp_spin_unlock(&d->mutex);
 			eprintk("Test14\n");
-			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&d->numReadLocks==0);
+			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&d->numReadLocks==0&& myTicket==d->ticket_tail);
 			/*while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
 				int checker=wait_event_interruptible(d->blockq,1);
@@ -380,7 +380,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				schedule();
 			}*/
 			eprintk("Test18\n");
-			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0);
+			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&myTicket=d->ticket_tail);
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
