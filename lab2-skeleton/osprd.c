@@ -316,6 +316,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		d->ticket_head++;
 		osp_spin_unlock(&d->mutex);
 		eprintk("Test11\n");
+		flg=0;
 		if(filp_writable)
 		{
 			osp_spin_lock(&d->mutex);
@@ -327,6 +328,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				if(c->pid==current->pid)//if process id matches with currently running process
 				{
 					osp_spin_unlock(&d->mutex);
+					flg=1;
 					return -EDEADLK;
 				}
 				else//iterate incrementation
@@ -336,17 +338,24 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				}
 			}
 			eprintk("Test13\n");
-			osp_spin_unlock(&d->mutex);
+			if(!flg)
+				osp_spin_unlock(&d->mutex);
 			eprintk("Test14\n");
-			while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
+			int initial=wait_event_interruptible(d->blockq,myTicket==d->ticket_tail);
+			/*while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
 				int checker=wait_event_interruptible(d->blockq,1);
 				if(checker==-ERESTARTSYS)
 					return -ERESTARTSYS;
 				schedule();
-			}
+			}*/
 			eprintk("Test15\n");
 			osp_spin_lock(&d->mutex);
+			if(signal_pending(current)||initial==-ERESTARTSYS)
+			{
+				d->ticket_tail++;
+				return -ERESTARTSYS;
+			}
 			eprintk("Test16\n");
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numWriteLocks++;
@@ -355,15 +364,21 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		else
 		{
 			eprintk("Test17\n");
-			while(d->numWriteLocks||myTicket!=d->ticket_tail)
+			/*while(d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
 				int checker=wait_event_interruptible(d->blockq,1);
 				if(checker==-ERESTARTSYS)
 					return -ERESTARTSYS;
 				schedule();
-			}
+			}*/
 			eprintk("Test18\n");
+			int initial=wait_event_interruptible(d->blockq,myTicket==d->ticket_tail);
 			osp_spin_lock(&d->mutex);
+			if(signal_pending(current)||initial==-ERESTARTSYS)
+			{
+				d->ticket_tail++;
+				return -ERESTARTSYS;
+			}
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numReadLocks++;
 			read_list_t p=d->readLockPids;
