@@ -360,7 +360,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			eprintk("Test16\n");
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numWriteLocks++;
-			d->numWriteLocks=current->pid;
+			d->writeLockPid=current->pid;
 		}
 		else
 		{
