@@ -470,6 +470,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			else
 			{
 				filp->f_flags |= F_OSPRD_LOCKED;
+				d->writeLockPid=current->pid;
 				d->numWriteLocks++;
 				r = 0;
 			}
@@ -486,6 +487,28 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			{
 				filp->f_flags |= F_OSPRD_LOCKED;
 				d->numReadLocks++;
+				read_list_t p=d->readLockPids;
+				read_list_t c=d->readLockPids;
+				eprintk("Test19\n");
+				if(p)
+				{
+					eprintk("Test20\n");
+					while(c)
+					{
+						p=c;
+						c=c->next;
+					}
+					p->next=kmalloc(sizeof(read_list_t),GFP_ATOMIC);
+					p->next->pid=current->pid;
+					p->next->next=NULL;
+				}
+				else
+				{
+					eprintk("Test21\n");
+					d->readLockPids=kmalloc(sizeof(read_list_t),GFP_ATOMIC);
+					d->readLockPids->pid=current->pid;
+					d->readLockPids->next=NULL;
+				}
 				r = 0;
 			}
 			eprintk("Test30\n");
