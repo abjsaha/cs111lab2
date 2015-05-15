@@ -178,7 +178,7 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 		// as appropriate.
 
 		// Your code here.
-		if(filp->f_flags&F_OSPRD_LOCKED)
+		/*if(filp->f_flags&F_OSPRD_LOCKED)
 		{
 			eprintk("Test1\n");
 			osp_spin_lock(&d->mutex);//acquire spin lock
@@ -223,6 +223,14 @@ static int osprd_close_last(struct inode *inode, struct file *filp)
 			filp->f_flags&=~F_OSPRD_LOCKED;
 			osp_spin_unlock(&d->mutex);//release spin lock
 			eprintk("Test6\n");
+		}*/
+		if(filp->f_flags&F_OSPRD_LOCKED)
+		{
+			if(filp->f_mode&FMODE_WRITE)
+				osprd_ioctl(inode,filp,OSPRDIOCRELEASE,1);
+			else
+				osprd_ioctl(inode,filp,OSPRDIOCRELEASE,0);
+			wake_up_all(&d->blockq);
 		}
 		// This line avoids compiler warnings; you may remove it.
 		(void) filp_writable, (void) d;
@@ -254,7 +262,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	(void) filp_writable, (void) d;
 
 	// Set 'r' to the ioctl's return value: 0 on success, negative on error
-
+	osp_spin_lock_init(&d->mutex);
 	if (cmd == OSPRDIOCACQUIRE) {
 		eprintk("Test71\n");
 		// EXERCISE: Lock the ramdisk.
