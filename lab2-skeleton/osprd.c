@@ -329,7 +329,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				eprintk("w checking for deadlock in ACQUIRE\n");
 				if(c->pid==current->pid)//if process id matches with currently running process
 				{
-					eprink("w deadlock in ACQUIRE\n");
+					eprintk("w deadlock in ACQUIRE\n");
 					osp_spin_unlock(&d->mutex);
 					flg=1;
 					return -EDEADLK;
@@ -387,7 +387,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			d->numReadLocks++;
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
-			eprink("adding read lock\n");
+			eprintk("adding read lock\n");
 			if(p)
 			{
 				while(c)
@@ -429,7 +429,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			eprintk("checking for deadlock in TRYACQUIRE"\n);
 			if(c->pid==current->pid)//if process id matches with currently running process
 			{
-				eprink("EBUSY in TRYACQUIRE"\n);
+				eprintk("EBUSY in TRYACQUIRE"\n);
 				osp_spin_unlock(&d->mutex);
 				return -EBUSY;
 				flg=1;
@@ -472,12 +472,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 			else
 			{
-				eprink("r locked"\n);
+				eprintk("r locked"\n);
 				filp->f_flags |= F_OSPRD_LOCKED;
 				d->numReadLocks++;
 				read_list_t p=d->readLockPids;
 				read_list_t c=d->readLockPids;
-				eprink("adding read lock\n");
+				eprintk("adding read lock\n");
 				if(p)
 				{
 					while(c)
