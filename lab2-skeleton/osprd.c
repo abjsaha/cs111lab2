@@ -380,7 +380,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				schedule();
 			}*/
 			eprintk("Test18\n");
-			int initial=wait_event_interruptible(d->blockq,myTicket==d->ticket_tail);
+			int initial=wait_event_interruptible(d->blockq,d->num_wl==0&&(d_myTicket==d->ticket_tail));
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
@@ -512,9 +512,35 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		if (arg == 1)
 		{
 			d->numWriteLocks--;
+			d->writeLockPid=-1;
 		}
 		else if(arg == 0)
 		{
+			read_list_t p=d->readLockPids;
+			read_list_t c=d->readLockPids;
+			eprintk("Test3\n");
+			while(c)//iterate through list of read locks
+			{
+				if(c->pid==current->pid)//if process id matches with currently running process
+				{
+					if(p)//if previous exists
+					{
+						c->pid=-1;
+						p->next=c->next;
+						break;
+					}
+					else//if previous is null
+					{
+						d->readLockPids=c->next;
+					}
+					eprintk("Test5\n");
+				}
+				else//iterate incrementation
+				{
+					p=c;
+					c=c->next;
+				}
+			}
 			d->numReadLocks--;
 		}
 		eprintk("Test33\n");
@@ -541,6 +567,10 @@ static void osprd_setup(osprd_info_t *d)
 	osp_spin_lock_init(&d->mutex);
 	d->ticket_head = d->ticket_tail = 0;
 	/* Add code here if you add fields to osprd_info_t. */
+	numWriteLocks=0;
+	numReadLocks=0;
+	writeLockPid=-1;
+	read_list_t readLockPids=NULL;
 }
 
 
