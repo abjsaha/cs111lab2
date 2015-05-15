@@ -72,7 +72,7 @@ typedef struct osprd_info {
 	int numWriteLocks;
 	int numReadLocks;
 	pid_t writeLockPid;
-	read_list_t readLockPids; 
+	read_list_t readLockPids;
 	// The following elements are used internally; you don't need
 	// to understand them.
 	struct request_queue *queue;    // The device request queue.
@@ -354,6 +354,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
 				d->ticket_tail++;
+				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
 			eprintk("Test16\n");
@@ -377,8 +378,11 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
 				d->ticket_tail++;
+				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
+			osp_spin_unlock(&d->mutex);
+			osp_spin_lock(&d->mutex);
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numReadLocks++;
 			read_list_t p=d->readLockPids;
@@ -405,9 +409,9 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			}
 		}
 		eprintk("Test22\n");
-		d->ticket_tail++;
 		osp_spin_unlock(&d->mutex);
 		eprintk("Test23\n");
+		r=0;
 	} else if (cmd == OSPRDIOCTRYACQUIRE) {
 
 		// EXERCISE: ATTEMPT to lock the ramdisk.
