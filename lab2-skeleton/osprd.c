@@ -326,8 +326,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			read_list_t c=d->readLockPids;
 			while(c)//iterate through list of read locks
 			{
+				eprintk("w checking for deadlock in ACQUIRE\n");
 				if(c->pid==current->pid)//if process id matches with currently running process
 				{
+					eprink("w deadlock in ACQUIRE\n");
 					osp_spin_unlock(&d->mutex);
 					flg=1;
 					return -EDEADLK;
@@ -350,10 +352,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
+				eprintk("w ERESTARTSYS\n");
 				d->ticket_tail++;
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
+			eprintk("w lock acquired\n");
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numWriteLocks++;
 			d->writeLockPid=current->pid;
@@ -371,16 +375,19 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
+				eprintk("r ERESTARTSYS\n");
 				d->ticket_tail++;
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
 			}
+			eprintk("r lock acquired\n");
 			osp_spin_unlock(&d->mutex);
 			osp_spin_lock(&d->mutex);
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numReadLocks++;
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
+			eprink("adding read lock\n");
 			if(p)
 			{
 				while(c)
@@ -419,8 +426,10 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		int flg=0;
 		while(c)//iterate through list of read locks
 		{
+			eprintk("checking for deadlock in TRYACQUIRE"\n);
 			if(c->pid==current->pid)//if process id matches with currently running process
 			{
+				eprink("EBUSY in TRYACQUIRE"\n);
 				osp_spin_unlock(&d->mutex);
 				return -EBUSY;
 				flg=1;
@@ -441,10 +450,12 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			if (d->numWriteLocks|| d->numReadLocks)
 			{
+				eprintk("w EBUSY"\n);
 				r = -EBUSY;
 			}
 			else
 			{
+				eprintk("w locked"\n);
 				filp->f_flags |= F_OSPRD_LOCKED;
 				d->writeLockPid=current->pid;
 				d->numWriteLocks++;
@@ -456,14 +467,17 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			if (d->numWriteLocks)
 			{
+				eprintk("r EBUSY");
 				r = -EBUSY;
 			}
 			else
 			{
+				eprink("r locked"\n);
 				filp->f_flags |= F_OSPRD_LOCKED;
 				d->numReadLocks++;
 				read_list_t p=d->readLockPids;
 				read_list_t c=d->readLockPids;
+				eprink("adding read lock\n");
 				if(p)
 				{
 					while(c)
