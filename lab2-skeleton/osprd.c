@@ -509,20 +509,22 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		eprintk("Test31\n");
 		osp_spin_lock(&d->mutex);
 		eprintk("Test32\n");
-		if (filp_writable)
+		if (arg == 1)
 		{
 			d->numWriteLocks--;
 		}
-		else
+		else if(arg == 0)
 		{
 			d->numReadLocks--;
 		}
 		eprintk("Test33\n");
-		wake_up_all(&d->blockq);
+		
 		filp->f_flags &= ~F_OSPRD_LOCKED;
+		wake_up_all(&d->blockq);
 		eprintk("Test34\n");
 		osp_spin_unlock(&d->mutex);
 		eprintk("Test35\n");
+		r=0;
 
 	} else
 		r = -ENOTTY; /* unknown command */
