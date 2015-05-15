@@ -316,7 +316,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		d->ticket_head++;
 		osp_spin_unlock(&d->mutex);
 		eprintk("Test11\n");
-		flg=0;
+		int flg=0;
 		if(filp_writable)
 		{
 			osp_spin_lock(&d->mutex);
