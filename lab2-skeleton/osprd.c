@@ -338,8 +338,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				}
 			}
 			eprintk("Test13\n");
-			if(!flg)
-				osp_spin_unlock(&d->mutex);
+			osp_spin_unlock(&d->mutex);
 			eprintk("Test14\n");
 			int initial=wait_event_interruptible(d->blockq,myTicket==d->ticket_tail);
 			/*while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
