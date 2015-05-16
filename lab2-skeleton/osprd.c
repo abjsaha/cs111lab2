@@ -254,7 +254,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 {
 	osprd_info_t *d = file2osprd(filp);	// device info
 	int r = 0;			// return value: initially 0
-	DEFINE_WAIT(wait);
 	// is file open for writing?
 	int filp_writable = (filp->f_mode & FMODE_WRITE) != 0;
 
@@ -306,7 +305,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		if(!d)
 			return -1;
 		osp_spin_lock(&d->mutex);
-		if(current->pid==d->writeLockPid&&filp_writable)
+		if(current->pid==d->writeLockPid/*&&filp_writable*/)
 		{
 			osp_spin_unlock(&d->mutex);
 			return -EDEADLK;
@@ -319,10 +318,54 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		osp_spin_lock(&d->mutex);
 		d->ticket_head++;
 		osp_spin_unlock(&d->mutex);
-		int flg=0;
 		if(filp_writable)
 		{
 			eprintk("enter write. ");
+			osp_spin_lock(&d->mutex);
+			read_list_t p=d->readLockPids;
+			read_list_t c=d->readLockPids;
+			while(c)//iterate through list of read locks
+			{
+				eprintk("w checking for deadlock in ACQUIRE. ");
+				if(c->pid==current->pid)//if process id matches with currently running process
+				{
+					eprintk("w deadlock in ACQUIRE. ");
+					osp_spin_unlock(&d->mutex);
+					return -EDEADLK;
+				}
+				else//iterate incrementation
+				{
+					p=c;
+					c=c->next;
+				}
+			}
+			osp_spin_unlock(&d->mutex);
+			//int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&d->numReadLocks==0/*&&myTicket==d->ticket_tail*/);
+			osp_spin_lock(&d->mutex);
+			/*if(signal_pending(current)||initial==-ERESTARTSYS)
+			{
+				eprintk("w ERESTARTSYS. ");
+				d->ticket_tail++;
+				osp_spin_unlock(&d->mutex);
+				return -ERESTARTSYS;
+			}*/
+			while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
+			{
+				int checker=wait_event_interruptible(d->blockq,1);
+				osp_spin_unlock(&d->mutex);
+				if(checker==-ERESTARTSYS)
+					return -ERESTARTSYS;
+				schedule();
+				osp_spin_lock(&d->mutex);
+			}
+			eprintk("w lock acquired. ");
+			filp->f_flags |= F_OSPRD_LOCKED;
+			d->numWriteLocks++;
+			d->writeLockPid=current->pid;
+		}
+		else
+		{
+			eprintk("enter read. ");
 			osp_spin_lock(&d->mutex);
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
@@ -343,39 +386,24 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				}
 			}
 			osp_spin_unlock(&d->mutex);
-			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&d->numReadLocks==0/*&&myTicket==d->ticket_tail*/);
-			/*while(d->numReadLocks||d->numWriteLocks||myTicket!=d->ticket_tail)
+			//int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0/*&&myTicket==d->ticket_tail*/);
+			osp_spin_lock(&d->mutex);
+			while(d->numWriteLocks||myTicket!=d->ticket_tail)
 			{
 				int checker=wait_event_interruptible(d->blockq,1);
+				osp_spin_unlock(&d->mutex);
 				if(checker==-ERESTARTSYS)
 					return -ERESTARTSYS;
 				schedule();
-			}*/
-			osp_spin_lock(&d->mutex);
-			if(signal_pending(current)||initial==-ERESTARTSYS)
-			{
-				eprintk("w ERESTARTSYS. ");
-				d->ticket_tail++;
-				osp_spin_unlock(&d->mutex);
-				return -ERESTARTSYS;
+				osp_spin_lock(&d->mutex);
 			}
-			eprintk("w lock acquired. ");
-			filp->f_flags |= F_OSPRD_LOCKED;
-			d->numWriteLocks++;
-			d->writeLockPid=current->pid;
-		}
-		else
-		{
-			eprintk("enter read. ");
-			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0/*&&myTicket==d->ticket_tail*/);
-			osp_spin_lock(&d->mutex);
-			if(signal_pending(current)||initial==-ERESTARTSYS)
+			/*if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
 				eprintk("r ERESTARTSYS. ");
 				d->ticket_tail++;
 				osp_spin_unlock(&d->mutex);
 				return -ERESTARTSYS;
-			}
+			}*/
 			eprintk("r lock acquired. ");
 			osp_spin_unlock(&d->mutex);
 			osp_spin_lock(&d->mutex);
@@ -402,6 +430,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				d->readLockPids->next=NULL;
 			}
 		}
+		d->ticket_tail++;
 		osp_spin_unlock(&d->mutex);
 		r=0;
 	} else if (cmd == OSPRDIOCTRYACQUIRE) {
@@ -416,55 +445,59 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		// Your code here (instead of the next two lines).
 		if(!d)
 			return -1;
-		osp_spin_lock(&d->mutex);
-		read_list_t p=d->readLockPids;
-		read_list_t c=d->readLockPids;
-		int flg=0;
-		while(c)//iterate through list of read locks
-		{
-			eprintk("checking for deadlock in TRYACQUIRE. ");
-			if(c->pid==current->pid)//if process id matches with currently running process
-			{
-				eprintk("EBUSY in TRYACQUIRE. ");
-				osp_spin_unlock(&d->mutex);
-				return -EBUSY;
-				flg=1;
-				break;
-				//return -EDEADLK;
-			}
-			else//iterate incrementation
-			{
-				p=c;
-				c=c->next;
-			}
-		}
-		osp_spin_unlock(&d->mutex);
-		//if(d->ticket_head!=d->ticket_tail)
-			//return -EBUSY;
-		osp_spin_lock(&d->mutex);
 		if (filp_writable)
 		{
-			if (d->numWriteLocks|| d->numReadLocks)
+			osp_spin_lock(&d->mutex);
+			if (d->numWriteLocks|| d->numReadLocks||d->ticket_head!=d->ticket_tail)
 			{
 				eprintk("w EBUSY. ");
-				r = -EBUSY;
+				osp_spin_unlock(&d->mutex);
+				return -EBUSY;
 			}
 			else
 			{
 				eprintk("w locked. ");
-				filp->f_flags |= F_OSPRD_LOCKED;
-				d->writeLockPid=current->pid;
-				d->numWriteLocks++;
-				r = 0;
+				if(d->writeLockPid==current->pid)
+				{
+					osp_spin_unlock(&d->mutex);
+					return -EBUSY;
+				}
+				else
+				{
+					read_list_t p=d->readLockPids;
+					read_list_t c=d->readLockPids;
+					while(c)//iterate through list of read locks
+					{
+						eprintk("checking for deadlock in TRYACQUIRE. ");
+						if(c->pid==current->pid)//if process id matches with currently running process
+						{
+							eprintk("EBUSY in TRYACQUIRE. ");
+							osp_spin_unlock(&d->mutex);
+							return -EBUSY;
+							break;
+						}
+						else//iterate incrementation
+						{
+							p=c;
+							c=c->next;
+						}
+					}
+					filp->f_flags |= F_OSPRD_LOCKED;
+					d->writeLockPid=current->pid;
+					d->numWriteLocks++;
+					r = 0;
+				}
 			}
 			osp_spin_unlock(&d->mutex);
 		}
 		else 
 		{
+			osp_spin_lock(&d->mutex);
 			if (d->numWriteLocks)
 			{
 				eprintk("r EBUSY. ");
-				r = -EBUSY;
+				osp_spin_unlock(&d->mutex);
+				return -EBUSY;
 			}
 			else
 			{
