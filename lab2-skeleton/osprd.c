@@ -264,6 +264,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 	// Set 'r' to the ioctl's return value: 0 on success, negative on error
 	osp_spin_lock_init(&d->mutex);
 	if (cmd == OSPRDIOCACQUIRE) {
+		eprintk("enter OSPRDIOCACQUIRE\n");
 		// EXERCISE: Lock the ramdisk.
 		//
 		// If *filp is open for writing (filp_writable), then attempt
@@ -321,6 +322,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		int flg=0;
 		if(filp_writable)
 		{
+			eprintk("enter write\n");
 			osp_spin_lock(&d->mutex);
 			read_list_t p=d->readLockPids;
 			read_list_t c=d->readLockPids;
@@ -364,6 +366,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else
 		{
+			eprintk("enter read\n");
 			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&myTicket==d->ticket_tail);
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
