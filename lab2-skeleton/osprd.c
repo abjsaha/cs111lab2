@@ -376,7 +376,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 				{
 					eprintk("w deadlock in ACQUIRE. ");
 					osp_spin_unlock(&d->mutex);
-					flg=1;
 					return -EDEADLK;
 				}
 				else//iterate incrementation
@@ -409,8 +408,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 			osp_spin_lock(&d->mutex);
 			filp->f_flags |= F_OSPRD_LOCKED;
 			d->numReadLocks++;
-			read_list_t p=d->readLockPids;
-			read_list_t c=d->readLockPids;
+			p=d->readLockPids;
+			c=d->readLockPids;
 			eprintk("adding read lock. ");
 			if(p)
 			{
