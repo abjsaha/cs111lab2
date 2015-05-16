@@ -364,7 +364,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else
 		{
-			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0/*&&myTicket==d->ticket_tail*/);
+			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0&&myTicket==d->ticket_tail);
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
 			{
