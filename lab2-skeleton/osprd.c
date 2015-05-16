@@ -254,7 +254,7 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 {
 	osprd_info_t *d = file2osprd(filp);	// device info
 	int r = 0;			// return value: initially 0
-
+	DEFINE_WAIT(wait);
 	// is file open for writing?
 	int filp_writable = (filp->f_mode & FMODE_WRITE) != 0;
 
@@ -314,8 +314,8 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		{
 			osp_spin_unlock(&d->mutex);
 		}
-		osp_spin_lock(&d->mutex);
 		unsigned myTicket=d->ticket_head;
+		osp_spin_lock(&d->mutex);
 		d->ticket_head++;
 		osp_spin_unlock(&d->mutex);
 		int flg=0;
@@ -364,13 +364,6 @@ int osprd_ioctl(struct inode *inode, struct file *filp,
 		}
 		else
 		{
-			/*while(d->numWriteLocks||myTicket!=d->ticket_tail)
-			{
-				int checker=wait_event_interruptible(d->blockq,1);
-				if(checker==-ERESTARTSYS)
-					return -ERESTARTSYS;
-				schedule();
-			}*/
 			int initial=wait_event_interruptible(d->blockq,d->numWriteLocks==0/*&&myTicket==d->ticket_tail*/);
 			osp_spin_lock(&d->mutex);
 			if(signal_pending(current)||initial==-ERESTARTSYS)
